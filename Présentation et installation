@@ -1,1 +1,185 @@
-eee
+DAVY Noah
+TDA TP1
+
+       SAE203 : Présentation et installation de la solution informatique.
+
+
+I.	Présentation : 
+
+Nous cherchons à développer un petit réseau d’entreprise comportant plusieurs machines : 
+	-  Un serveur central, le coeur du réseau et directement connecté à internet,
+	-  Deux serveurs DHCP étant chacun sur un réseau différent (comportant une interface
+	physique et virtuelle) mais reliés au serveur central,
+	-  Pour chaque serveur DHCP, deux clients seront créés et y seront liés via un VLAN.
+
+Grâce aux différentes configurations et modifications apportées, l’administrateur système/réseau sera en capacité de gérer de manière efficace les serveurs DHCP ainsi que les clients qui y sont reliés directement via un serveur central, pour une meilleure gestion et un contrôle optimal.
+
+1)	Architecture principale :
+	Serveur central :
+		-  Une paire de Clés SSH (rsa) créée et transférée dans le fichier authorized_keys de
+		l’utilisateur devant exécuter les commandes sur les serveurs DHCP,
+		-  Un fichier de configuration YAML (appelé config.yaml) pour la configuration
+ 		globale,
+		-  Trois modules dhcp.py (configuration de dnsmasq), config.py (charger le fichier
+		de configuration, validation.py (valider adresses MAC et IP),
+		-  Quatre commandes développées à l’aide de programmes python : add-dhcp-client,
+                        remove-dhcp-client, check-dhcp, check-dhcp.
+	Serveurs DHCP :
+		-  Script de filtrage des connexions ssh (en bash ou python) (dans
+		/usr/local/bin/restriction.sh de l’utilisateur exécutant les commandes sur les serveurs 
+		DHCP),
+		-  réservations d’IP configurées (fichier de config dans /etc/dnsmasq.d/hosts.conf),
+		-  dnsmasq configuré,
+		-  restrictions de l’utilisation de sudo dans /etc/sudoers.d/sudo_dhcp.
+
+2)	Principales fonctionnalités : 
+		-  Gestion des correspondances IP/MAC existantes,
+		-  Ajout d’associations IP/MAC dans la configuration dnsmasq,
+		-  Listage des configurations existantes,
+		-  Suppression/Mise à jour des associations existantes,
+		-  Validation des formats d’adresses IP et MAC.
+
+Ces fonctionnalités sont disponibles grâce à certaines commandes au préalable programées : 
+.  add-dhcp-client → ajouter un client DHCP à partir des paramètres de la machine,
+.  remove-dhcp-client → supprimer un client DHCP,
+.  check-dhcp → vérifier l’intégrité de la configuration DHCP et peut la corriger,
+.  list-dhcp → afficher de manière formattée la configuration DHCP de tous les réseaux/un réseau en particulier.
+
+3)	Mesures de sécurité :
+		-  Vérification des associations IP/MAC (pas de doublons),
+		-  Possibilité de redémarrer le service dnsmasq après modification,
+		-  Commandes effectuées via une connexion ssh restreinte et sécurisée.
+
+
+II.	Guide d’installation :
+
+1)	Prérequis techniques :
+		-  Tous les paquets doivent être à jour (cela est mieux) : apt-get update →apt
+		update et apt-get upgrade → apt upgrade.
+		-  Python 3.6 ou supérieur,	
+		-  OS linux (ubuntu, debian…),
+		-  Paquets installés : fabric, ipaddress, pyyaml,
+		-  Accès SSH pour les connexions aux serveurs distants.
+		-  Un compte utilisateur d’administration sur le serveur central ainsi que sur les
+		serveurs DHCP,
+		-  Permissions sudo optimales pour l’utilisateur exécutant les commandes.
+	
+2)	Configuration du serveur central :
+		-  Génération d’une paire de clés SSH (type rsa par défaut),
+		-  Compte utilisateur d’administration avec droits sudo (sae203 ou autre),
+		-  Python3 installé (version 3.8 suffisante),
+		-  Certains modules python : fabric – pyyaml – yaml,
+		-  3 interfaces réseau :
+			.  une physique directement connectée à internet,
+			.  deux virtuelles, une pour chaque réseau.
+
+3)	Configuration des serveurs DHCP :
+		-  Compte utilisateur d’administration avec droits sudo (sae203 ou autre),
+		-  Compte utilisateur spécifique pour exécuter les commandes,
+		-  Clé rsa publique transférée dans le fichier authorized_keys du compte utilisateur
+		spécifique sur les deux serveurs DHCP → ssh activé et donc configuré,
+		-  dnsmasq configuré (fichier dans /etc/dnsmasq.d/),
+		-  Python3 version 3.8 ou plus.
+
+Configuration générale : 
+
+1)	Serveur central :
+		-  pip3 install fabric yaml pyyaml - pour avoir les modules
+		nécessaires,
+
+		-  Création du répertoire contenant tous les scripts :
+		mkdir ~/gestion-dhcp (rajouter l’option -p pour créer le répertoire /home si 
+		absent),
+		
+		-  Création du répertoire contenant la paire de clés ssh devant être générée :
+ 		mkdir ~/.ssh,
+
+		-  Créer la paire de clés et transférer la clé publique sur les serveurs DHCP:
+		. ssh-keygen -f ~/.ssh/dhcp_key
+		. ssh-copy-id -i ~/.ssh/dhcp_key.pub sae203@10.20.1.5
+            . ssh-copy-id -i ~/.ssh/dhcp_key.pub sae203@10.20.2.5
+  		(option -i afin de préciser la clé).
+2)	Serveurs DHCP : 
+		-  sudo apt install python3 – installer python3,
+
+		-  sudo apt install dnsmasq – installer dnsmasq pour pouvoir le configurer,
+
+		-  sudo touch /etc/dnsmasq.d/hosts.conf – création du fichier de 
+ 		réservation d’adresses DHCP,
+
+ 		-  sudo chmod 644 /etc/dnsmasq.d/hosts.conf – attribuer les bonnes 
+ 		persmissions.
+
+3)	Utilisateur spécifique (à faire sur les deux serveurs DHCP) :
+		-  sudo groupadd superv – créer le groupe de l’utilisateur spécial,
+
+		-  sudo useradd -m -s /bin/bash -G superv dhcp – créer et ajouter 
+		l’utilisateur spécial (dhcp ici) à son groupe,
+
+		-  sudo cp dhcp_key.pub /home/dhcp/.ssh/authorized_keys – 
+		copier la clé publique dans le fichier authorized_keys de l’utilisateur dhcp,
+
+		-  En tant qu’utilisateur dhcp, créer le fichier restriction.sh afin de filtrer les 
+		connexions ssh de cet utilisateur et donner les bonnes permissions (en tant 
+		qu’utilisateur d’administration) : 
+			. nano /usr/local/bin/restriction.sh,
+			. sudo chmod +x /usr/local/bin/restriction.sh,
+			. sudo chown root:root /usr/local/bin/restriction.sh,
+
+		-  Depuis l’utilisateur d’administration, créer un fichier sudo_dhcp dans 
+		/etc/sudoers.d/ et ajouter les lignes suivantes et donner les bonnes permissions 
+		(commandes que l’utilisateur dhcp peut exécuter en tant que root sans mot de passe) : 
+		dhcp ALL=(root) NOPASSWD: /usr/bin/systemctl restart dnsmasq
+		dhcp ALL=(root) NOPASSWD: /usr/bin/systemctl status dnsmasq	
+		#pour lire le contenu de hosts.conf (MAC - IP - nom_machine)
+		dhcp ALL=(root) NOPASSWD: /bin/cat /etc/dnsmasq.d/hosts.conf
+		#pour supprimer une association dans le fichier de configuration
+		dhcp ALL=(root) NOPASSWD: /usr/bin/sed -i /etc/dnsmasq.d/hosts.conf
+		#modifier le fichier hosts.conf (avec tee on modifie via un pipe)
+		dhcp ALL=(root) NOPASSWD: /usr/bin/tee /etc/dnsmasq.d/hosts.conf
+ 
+		sudo chmod 440 /etc/sudoers.d/sudo_dhcp
+
+		-  Modifier le fichier ~/.ssh/authorized_keys de l’utilisateur dhcp sur les 2 serveurs 
+		DHCP :
+			. nano ~/.ssh/authorized_keys,
+			. modifier le contenu du fichier pour avoir ceci : 
+			command="/usr/local/bin/restriction.sh",no-port-
+			forwarding,no-X11-forwarding,no-agent-forwarding 
+			ssh-rsa AAAA...
+		
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

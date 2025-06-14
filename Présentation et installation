@@ -54,9 +54,9 @@ Ces fonctionnalités sont disponibles grâce à certaines commandes au préalabl
 II.	Guide d’installation :
 
 1)	Prérequis techniques :
-		-  Tous les paquets doivent être à jour (cela est mieux) : apt-get update →apt
+		-  Tous les paquets doivent être à jour (cela est mieux) : apt-get update → apt
 		update et apt-get upgrade → apt upgrade.
-		-  Python 3.6 ou supérieur,	
+		-  Python 3.8 ou supérieur,	
 		-  OS linux (ubuntu, debian…),
 		-  Paquets installés : fabric, ipaddress, pyyaml,
 		-  Accès SSH pour les connexions aux serveurs distants.
@@ -88,17 +88,18 @@ Configuration générale :
 		nécessaires,
 
 		-  Création du répertoire contenant tous les scripts :
-		mkdir ~/gestion-dhcp (rajouter l’option -p pour créer le répertoire /home si 
+		mkdir ~/gestion_dhcp (rajouter l’option -p pour créer le répertoire /home si 
 		absent),
 		
 		-  Création du répertoire contenant la paire de clés ssh devant être générée :
  		mkdir ~/.ssh,
 
 		-  Créer la paire de clés et transférer la clé publique sur les serveurs DHCP:
-		. ssh-keygen -f ~/.ssh/dhcp_key
-		. ssh-copy-id -i ~/.ssh/dhcp_key.pub sae203@10.20.1.5
-            . ssh-copy-id -i ~/.ssh/dhcp_key.pub sae203@10.20.2.5
+		. ssh-keygen -f ~/.ssh/nopass_key
+		. ssh-copy-id -i ~/.ssh/nopass_key.pub sae203@10.20.1.5
+                . ssh-copy-id -i ~/.ssh/nopass_key.pub sae203@10.20.2.5
   		(option -i afin de préciser la clé).
+
 2)	Serveurs DHCP : 
 		-  sudo apt install python3 – installer python3,
 
@@ -120,8 +121,15 @@ Configuration générale :
 		copier la clé publique dans le fichier authorized_keys de l’utilisateur dhcp,
 
 		-  En tant qu’utilisateur dhcp, créer le fichier restriction.sh afin de filtrer les 
-		connexions ssh de cet utilisateur et donner les bonnes permissions (en tant 
-		qu’utilisateur d’administration) : 
+		connexions ssh de cet utilisateur : 
+			. le script devra faire en sorte que l'utilisateur dhcp ne puisse exécuter
+			seulement les commandes nécessaires à la gestion des serveurs DHCP : 
+				. il doit pouvoir redémarrer dnsmasq,
+				. doit pouvoir voir l'état du service (actif ou non),
+				. afficher son contenu (pour l'analyser par exemple),
+				. doit pouvoir le modifier (ajouter/supprimer une association MAC/IP).
+		
+		-  Donner les bonnes permissions pour ce fichier (en tant qu’utilisateur d’administration) : 
 			. nano /usr/local/bin/restriction.sh,
 			. sudo chmod +x /usr/local/bin/restriction.sh,
 			. sudo chown root:root /usr/local/bin/restriction.sh,
@@ -133,10 +141,10 @@ Configuration générale :
 		dhcp ALL=(root) NOPASSWD: /usr/bin/systemctl status dnsmasq	
 		#pour lire le contenu de hosts.conf (MAC - IP - nom_machine)
 		dhcp ALL=(root) NOPASSWD: /bin/cat /etc/dnsmasq.d/hosts.conf
-		#pour supprimer une association dans le fichier de configuration
-		dhcp ALL=(root) NOPASSWD: /usr/bin/sed -i /etc/dnsmasq.d/hosts.conf
-		#modifier le fichier hosts.conf (avec tee on modifie via un pipe)
-		dhcp ALL=(root) NOPASSWD: /usr/bin/tee /etc/dnsmasq.d/hosts.conf
+		#pour supprimer une association dans le fichier hosts.conf
+		dhcp ALL=(root) NOPASSWD: /usr/bin/sed -i "/*/d" /etc/dnsmasq.d/hosts.conf
+		#pour ajouter une association dans le fichier hosts.conf
+		dhcp ALL=(root) NOPASSWD: /usr/bin/tee -a /etc/dnsmasq.d/hosts.conf
  
 		sudo chmod 440 /etc/sudoers.d/sudo_dhcp
 
@@ -144,12 +152,146 @@ Configuration générale :
 		DHCP :
 			. nano ~/.ssh/authorized_keys,
 			. modifier le contenu du fichier pour avoir ceci : 
-			command="/usr/local/bin/restriction.sh",no-port-
-			forwarding,no-X11-forwarding,no-agent-forwarding 
-			ssh-rsa AAAA...
+			command="/usr/local/bin/restriction.sh",no-port-forwarding,no-X11-forwarding,no-agent-forwarding ssh-rsa AAAA...
+
+III.	Test :
+
+À faire avant tout test : 
+	1)	Vérifier que tous les fichiers (commandes python ainsi que les modules python et le fichier de configuration 
+		config.yaml) soient présents dans le répertoire ~/gestion_dhcp.
+
+	2)	Vérifier chaque fichier, exemple : 
+			-  Le fichier config.yaml doit contenir le chemin menant au fichier hosts.conf dans lequel se trouvent tous les
+			hôtes d'un réseau,
+			-  Doit contenir l'utilisateur qui sera utilisé pour exécuter les commandes,
+			-  Doit contenir tous les réseaux existants et reliés au serveur central...
+
+	3)	Vérifier les permissions de chaque fichier, exemple : 
+		Le fichier restriction.sh (le script restreignant les connexions ssh de l'utilisateur dhcp aux 
+		commandes qu'il peut exécuter) doit avoir pour propriétaire root et doit être exécutable.
+
+	4)	Vérifier que la clé publique soit bien dans le fichier authorized_keys de l'utilisateur dhcp et que 
+		le script restriction.sh lui soit bien appliqué : command="/usr/local/bin/restriction.sh"...
+
+Pour ce qui est des tests (tout depuis le serveur central, en tant que sae203) :
+A)  Le script restriction.sh :
+	1)	Tester une commande autorisée dans le script restriction.sh vers un serveur DHCP :
+		ssh -i /home/sae203/.ssh/nopass_key dhcp@10.20.X.5 "sudo systemctl status dnsmasq" -> doit afficher ceci : 
 		
+			sae203@srv-central:~$ ssh -i /home/sae203/.ssh/nopass_key dhcp@10.20.X.5 "sudo systemctl status dnsmasq"
+			Commande autorisee, execution :
+			* dnsmasq.service - dnsmasq - A lightweight DHCP and caching DNS server
+			     Loaded: loaded (/lib/systemd/system/dnsmasq.service; enabled; vendor preset: enabled)
+			     Active: active (running) since Sat 2025-06-14 20:24:44 CEST; 1h 42min ago
+			     ...
 
+	2)	Tester une commande non-autorisée : 
+		ssh -i /home/sae203/.ssh/nopass_key dhcp@10.20.X.5 "ls -la" -> doit afficher ceci : 
 
+			sae203@srv-central:~$ ssh -i /home/sae203/.ssh/nopass_key dhcp@10.20.X.5 "ls -al"
+			Non non non, commande interdite : ls -la
+			Voici les commandes autorisees :
+			- sudo systemctl restart dnsmasq
+			- sudo systemctl status dnsmasq
+			- sudo cat /etc/dnsmasq.d/hosts.conf
+		
+	3)	Tester sans commande : 
+		ssh -i /home/sae203/.ssh/nopass_key dhcp@10.20.X.5 -> doit afficher ceci : 
+
+			sae203@srv-central:~$ ssh -i /home/sae203/.ssh/nopass_key dhcp@10.20.X.5         
+			Pas de commande. Connexion refusee !
+			Connection to 10.20.1.5 closed.
+
+B)  Les modules dhcp.py, config.py et validation.py (à savoir, vous pouvez les modifier, pour faire des tests par exemple) : 
+Dans le répertoire gestion_dhcp (c'est ici que se trouvent tous les fichers, donc ici qu'il faut tester) :
+	1)	Tester dhcp.py -> python3 dhcp.py -> doit afficher ceci : 
+
+			sae203@srv-central:~/gestion_dhcp$ python3 dhcp.py 
+			Fichier config bien charge
+
+	2)	Tester config.py -> doit afficher ceci : 
+
+			sae203@srv-central:~/gestion_dhcp$ python3 config.py 
+			{'10.20.1.5': '10.20.1.0/24'} -> serveur DHCP du client ainsi que son réseau
+			{'10.20.2.5': '10.20.2.0/24'} -> même chose
+			None -> client n'étant dans aucun des réseaux des serveurs DHCP présents
+
+	3)	Tester validation.py -> ne doit rien afficher (cela montre que le code s'exécute normalement) :
+	
+			sae203@srv-central:~/gestion_dhcp$ python3 validation.py
+			sae203@srv-central:~/gestion_dhcp$
+			Vous avez la possibilité de modifier le main de ce module afin d'afficher les résultats (des print...)
+	
+C)  Les commandes add-dhcp-client.py, remove-dhcp-client.py (delete-dhcp-client.py), check-dhcp.py, list-dhcp.py :
+	1)	Tester add-dhcp-client.py :
+		python3 add-dhcp-client.py MAC IP -> on devrait avoir une nouvelle ligne dans hosts.conf :
+
+			sae203@srv-central:~/gestion_dhcp$ python3 add-dhcp-client.py MAC IP
+			dhcp-host=52:54:01:02:03:11,10.20.1.99
+			dhcp-host=52:54:01:02:03:12,10.20.1.100
+			dhcp-host=MAC,IP -> nouvelle ligne
+
+	2)	Tester remove-dhcp-client.py :
+		python3 delete-dhcp-client.py MAC -> plusieurs cas de figure :
+
+			-  Si l'adresse MAC n'existe pas :
+			sae203@srv-central:~/gestion_dhcp$ python3 delete-dhcp-client.py MAC_INEXISTANTE
+			MAC address not found
+		
+			-  Si l'on rentre une adresse MAC qui existe :
+			sae203@srv-central:~/gestion_dhcp$ python3 delete-dhcp-client.py 52:54:01:02:03:12 -> la ligne 
+			comportant cette association doit être supprimée, on doit avoir ceci dans hosts.conf :
+			dhcp-host=52:54:01:02:03:11,10.20.1.99
+
+			-  Si l'adresse MAC n'est pas correcte :
+			sae203@srv-central:~/gestion_dhcp$ python3 delete-dhcp-client.py 42:1b:gg:hh:a5:0c -> doit afficher cela :
+			error : bad MAC address
+
+	3)	Tester check-dhcp.py :
+		python3 check-dhcp.py [IP ou RESEAU] -> supposons que l'on ait config.yaml : 
+			dhcp_hosts_cfg: /etc/dnsmasq.d/hosts.conf
+			user: sae203
+			dhcp-servers:
+			  10.20.50.3: 10.20.50.0/24
+			  10.20.60.8: 10.20.60.0/24
+
+		et /etc/dnsmasq.d/hosts.conf : 
+			dhcp-host=11:22:33:44:55:66,10.20.50.100
+			dhcp-host=12:34:56:78:9a:bc,10.20.50.110
+			dhcp-host=ee:dd:cc:bb:aa:99,10.20.50.113
+			dhcp-host=99:88:77:66:55:44,10.20.50.110
+			dhcp-host=11:22:33:44:55:66,10.20.50.125
+
+		On doit obtenir ceci : 
+			sae203@srv-central:/gestion_dhcp$ python3 dhcp-check.py 10.20.1.50/24
+			duplicate MAC addresses:
+			dhcp-host=11:22:33:44:55:66,10.20.50.100
+			dhcp-host=11:22:33:44:55:66,10.20.50.125
+			duplicate IP adresses:
+			dhcp-host=12:34:56:78:9a:bc,10.20.50.110
+			dhcp-host=99:88:77:66:55:44,10.20.50.110
+
+	4)	Tester list-dhcp.py :
+		python3 list-dhcp.py [serveur] -> plusieurs possibilités (exemple pour le serveur DHCP 1), car préciser le serveur est optionnel :
+
+			-  python3 list-dhcp.py -> doit lister les hôtes de tous les serveurs DHCP existants :
+				sae203@srv-central:~/gestion_dhcp$ python3 list-dhcp.py
+				10.20.1.5 :
+				52:54:01:02:03:11		10.20.1.99
+				52:54:01:02:03:12		10.20.1.100
+				10.20.2.5 :
+				52:54:01:02:03:21		10.20.2.115
+				52:54:01:02:03:22		10.20.2.116
+
+			-  python3 list-dhcp.py [serveur] -> doit afficher le serveur ainsi que ses hôtes :
+				sae203@srv-central:~/gestion_dhcp$ python3 list-dhcp.py 10.20.1.5
+				10.20.X.5 :
+				52:54:01:02:03:XX		10.20.X.X
+				52:54:01:02:03:XX		10.20.X.X
+		
+		
+		
+		
 
 
 

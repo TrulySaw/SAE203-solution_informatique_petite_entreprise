@@ -284,7 +284,7 @@ C)  Les commandes add-dhcp-client.py, remove-dhcp-client.py (delete-dhcp-client.
 				52:54:01:02:03:22		10.20.2.116
 
 			-  python3 list-dhcp.py [serveur] -> doit afficher le serveur ainsi que ses hôtes :
-				sae203@srv-central:~/gestion_dhcp$ python3 list-dhcp.py 10.20.1.5
+				sae203@srv-central:~/gestion_dhcp$ python3 list-dhcp.py 10.20.X.5
 				10.20.X.5 :
 				52:54:01:02:03:XX		10.20.X.X
 				52:54:01:02:03:XX		10.20.X.X

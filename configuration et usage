@@ -39,8 +39,8 @@ Fonctionnalités principales :
 
   Copie de la clé publique dans le ficher ~/.ssh/authorized_keys (se fait automatiquement avec copy-id) de l'utilisateur spécial dhcp :
 
-        ssh-copy-id dhcp@10.20.1.5:
-        ssh-copy-id dhcp@10.20.2.5:
+        ssh-copy-id dhcp@10.20.1.5
+        ssh-copy-id dhcp@10.20.2.5
 
   ATTENTION : si d'autres paires de clés ont été généré auparavant, préciser la clé à transférer comme suit : ssh-copy-id -i ~/.ssh/CLE_A_TRANSFERER ...
   
@@ -63,245 +63,201 @@ Fonctionnalités principales :
   
         dhcp ALL=(root) NOPASSWD: /usr/bin/systemctl restart dnsmasq
         dhcp ALL=(root) NOPASSWD: /usr/bin/systemctl status dnsmasq
+        #pour lire le contenu de hosts.conf (MAC - IP - nom_machine)
         dhcp ALL=(root) NOPASSWD: /bin/cat /etc/dnsmasq.d/hosts.conf
-        dhcp ALL=(root) NOPASSWD: /usr/bin/sed "/d/" /etc/dnsmasq.d/hosts.conf
-        dhcp ALL=(root) NOPASSWD: /usr/bin/tee /etc/dnsmasq.d/hosts.conf
+        #pour supprimer une association dans le fichier hosts.conf
+        dhcp ALL=(root) NOPASSWD: /usr/bin/sed -i "/*/d" etc/dnsmasq.d/hosts.conf
+        #pour ajouter une association dans le fichier hosts.conf
+        dhcp ALL=(root) NOPASSWD: /usr/bin/tee -a /etc/dnsmasq.d/hosts.conf
 
-4. Installation des dépendances
-Installation de Python et pip :
+4. Installation des dépendances : 
+   Installation de Python et pip :
+      
+      sudo apt update
+      sudo apt install python3 python3-pip
+      
+   Installation de Fabric :
+      
+      pip3 install fabric
+      
+   Installation de PyYAML pour la configuration :
+      
+      pip3 install pyyaml
 
-sudo apt update
-sudo apt install python3 python3-pip
+5. Structure du projet : 
 
-Installation de Fabric :
-
-pip3 install fabric
-
-Installation de PyYAML pour la configuration :
-
-pip3 install pyyaml
-
-Manuel des commandes
-add-dhcp-client.py
-Syntaxe
-add-dhcp-client.py MAC IP
-
-Description
-Cette commande ajoute une association MAC/IP dans la configuration dnsmasq d'un serveur DHCP. Elle valide les paramètres d'entrée, identifie automatiquement le serveur DHCP concerné, vérifie les conflits potentiels (IP/MAC déjà utilisées), met à jour la configuration et redémarre le service.
-
-Paramètres
-MAC : adresse MAC au format xx:xx:xx:xx:xx:xx
-IP : adresse IP à associer
-Fichiers utilisés
-config.yml : configuration des serveurs
-/etc/dnsmasq.d/hosts.conf : configuration dnsmasq sur les serveurs distants
-Exemples
-Ajout d'une nouvelle association :
-
- $  add-dhcp-client.py 1f:22:33:44:55:66 10.20.1.53
-Configuration du serveur dnsmasq en 10.20.1.5 mise à jour
-
-Modification d'une association existante :
-
- $  add-dhcp-client.py 42:46:dd:51:10:c1 10.20.1.100
-Configuration mise à jour
-
-Gestion des erreurs :
-
- $  add-dhcp-client.py 42:1b:22:55:a5:0c 10.20.1.100
-error: IP address already in use.
-
-Codes de retour
-0 : succès
-1 : erreur de paramètres ou conflit
-remove-dhcp-client.py
-Syntaxe
-remove-dhcp-client.py MAC
-
-Description
-Cette commande supprime une association MAC/IP de la configuration dnsmasq. Elle recherche l'adresse MAC sur tous les serveurs DHCP, supprime la directive dhcp-host correspondante et redémarre le service dnsmasq.
-
-Paramètres
-MAC : adresse MAC à supprimer
-Fichiers utilisés
-config.yml : configuration des serveurs
-/etc/dnsmasq.d/hosts.conf : configuration dnsmasq sur les serveurs distants
-Exemples
-Suppression réussie :
-
- $  remove-dhcp-client.py 42:46:dd:51:10:c1
-Configuration mise à jour
-
-MAC non trouvée :
-
- $  remove-dhcp-client.py 42:11:22:33:44:55
-MAC address not found
-
-Codes de retour
-0 : suppression réussie
-1 : MAC non trouvée ou erreur de paramètre
-check-dhcp.py
-Syntaxe
-check-dhcp.py [IP-OU-RESEAU]
-
-Description
-Cette commande vérifie la cohérence des configurations DHCP. Elle détecte les adresses MAC dupliquées, les adresses IP dupliquées et les incohérences dans les mappings.
-
-Paramètres
-IP-OU-RESEAU : paramètre optionnel spécifiant l'IP du serveur DHCP ou le réseau (exemple : 10.20.1.5 ou 10.20.1.0/24)
-Fichiers utilisés
-config.yml : configuration des serveurs
-/etc/dnsmasq.d/hosts.conf : configuration dnsmasq sur les serveurs distants
-Exemples
-Vérification d'un serveur spécifique :
-
- $  check-dhcp.py 10.20.50.0/24
-duplicate MAC addresses:
-dhcp-host=11:22:33:44:55:66,10.20.50.100
-dhcp-host=11:22:33:44:55:66,10.20.50.125
-duplicate IP addresses:
-dhcp-host=12:34:56:78:9a:bc,10.20.50.110
-dhcp-host=99:88:77:66:55:44,10.20.50.110
-
-Vérification de tous les serveurs :
-
- $  check-dhcp.py
-
-Cette commande analyse tous les serveurs définis dans config.yml.
-
-Codes de retour
-0 : aucune erreur détectée
-1 : erreurs détectées ou serveur non trouvé
-list-dhcp.py
-Syntaxe
-list-dhcp.py [serveur]
-
-Description
-Cette commande liste les associations MAC/IP configurées. Elle affiche les données sous forme de colonnes alignées (MAC | IP) avec séparation par espaces ou tabulations, et groupement par serveur si applicable.
-
-Paramètres
-serveur : paramètre optionnel spécifiant l'IP ou le nom du serveur DHCP
-Fichiers utilisés
-config.yml : configuration des serveurs
-/etc/dnsmasq.d/hosts.conf : configuration dnsmasq sur les serveurs distants
-Exemples
-Listage d'un serveur spécifique :
-
- $  list-dhcp.py 10.20.1.5
-12:34:56:78:9a:bc    10.20.1.105
-11:33:55:77:99:bb    10.20.1.112
-1f:2e:3d:4c:5b:6a    10.20.1.125
-
-Listage de tous les serveurs :
-
-$ list-dhcp.py
-10.20.50.3:
-4f:6e:42:cc:d8:09    10.20.50.114
-83:16:44:da:94:c0    10.20.50.147
-a8:52:4f:11:26:44    10.20.50.44
-10.20.60.8:
-52:46:a8:01:15:4f    10.20.60.139
-57:6a:88:a1:b4:78    10.20.60.200
-
-Codes de retour
-0 : listing réussi
-1 : erreur de connexion ou serveur non trouvé
-Architecture des fichiers
-Structure du projet
 Le projet se compose des éléments suivants :
+      - config.yaml : fichier de configuration principal,
+      - add-dhcp-client.py : commande d'ajout d'une association,
+      - remove-dhcp-client.py : commande de suppression d'une association,
+      - check-dhcp.py : commande de vérification et de mise à jour d'une association,
+      - list-dhcp.py : commande de listage de toutes les associations ou celle d'un serveur en particulier,
+      - config.py : module comportant les fonctions permettant de charger le fichier de configuration et de rechercher un serveur,
+      - dhcp.py : module comportant les fonctions qui seront utilisées par les commandes,
+      - validation.py : module comportant les fonctions de vérification des paramètres.
 
-config.yml : configuration principale
-add-dhcp-client.py : commande d'ajout
-remove-dhcp-client.py : commande de suppression
-check-dhcp.py : commande de vérification
-list-dhcp.py : commande de listage
-Un répertoire modules contient :
+Module dhcp.py : 
+      - ip_other_mac_exists(cnx, ip, mac, cfg) : vérifie si une IP est déjà utilisée par une autre adresse MAC,
+      - mac_exists(cnx, mac, cfg) : vérifie si une adresse MAC est déjà présente dans la configuration,
+      - dhcp_add(ip, mac, server, cfg) : ajoute une correspondance MAC/IP,
+      - dhcp_remove(mac, server, cfg) : supprime une configuration DHCP associée à une adresse MAC,
+      - dhcp_list(server, cfg) : retourne une liste des associations du serveur spécifié.
 
-dhcp.py : fonctions DHCP
-config.py : gestion configuration
-validation.py : validation des paramètres
-init.py
-Modules Python
-Module dhcp.py
-Ce module contient les fonctions suivantes :
+Module config.py :
+      load_config(filename, create) : charge la configuration grâce au fichier config.yaml,
+      get_dhcp_server(ip, cfg) : recherche le serveur dhcp correspondant à l'adresse IP.
 
-ip_other_mac_exists(cnx, ip, mac, cfg) : vérifie si une IP est déjà utilisée par une autre adresse MAC
-mac_exists(cnx, mac, cfg) : vérifie si une adresse MAC est déjà présente dans la configuration
-dhcp_add(ip, mac, server, cfg) : ajoute une correspondance IP/MAC
-dhcp_remove(mac, server, cfg) : supprime une configuration DHCP associée à une adresse MAC
-dhcp_list(server, cfg) : retourne une liste des configurations DHCP
-Module config.py
-Ce module contient les fonctions suivantes :
+Module validation.py :
+      - ip_valide(ip) : valide le format d'une adresse IP.
+      - mac_valide(mac) : valide le format d'une adresse MAC,
 
-load_config(filename, create) : charge la configuration depuis un fichier YAML
-get_dhcp_server(ip, cfg) : recherche un serveur DHCP correspondant à une adresse IP
-Module validation.py
-Ce module contient les fonctions de validation :
+6. Manuel des commandes : 
 
-validate_mac_address(mac) : valide le format d'une adresse MAC
-validate_ip_address(ip) : valide le format d'une adresse IP
-Dépannage
-Problèmes courants
-Erreur de connexion SSH
-Vérification de la connectivité :
+a. add-dhcp-client.py : 
 
-ssh sae203@10.20.1.5
+      Syntaxe : 
+            add-dhcp-client.py MAC IP
+      Description : 
+            - vérifie la validé des paramètres (IP, MAC),
+            - identifie le serveur DHCP concerné (en fonction de l'adresse IP), si aucun serveur identifié -> erreur "Unable to identify DHCP server",
+            - vérifie que l'IP n'est pas déjà utilisée, si non -> nouvelle directive, sinon erreur, 
+            - vérifie que l'adresse MAC n'est pas déjà utilisée, si déjà utilisée -> mise à jour de la directive avec nouvelle IP, si non -> erreur "IP déjà attribuéeé",
+            - met à jour la configuration et redémarre dnsmasq.
 
-Test des clés SSH :
+Paramètres : 
+      MAC : adresse MAC au format xx:xx:xx:xx:xx:xx,
+      IP : adresse IP pivée.
 
-ssh -i ~/.ssh/id_rsa sae203@10.20.1.5
+Fichiers utilisés :
+      config.yaml : fichier de configuration des serveurs dhcp distants,
+      /etc/dnsmasq.d/hosts.conf : fichier de configuration dnsmasq sur les serveurs distants.
 
-Permissions sudo insuffisantes
-Vérification des permissions :
+Exemples :
+      - ajout d'une nouvelle association :  
+      $add-dhcp-client.py XX:XX:XX:XX:XX:XX 10.20.1.53 -> nouvelle ligne dans hosts.conf.
+      
+      - modification d'une association existante :
+      $add-dhcp-client.py XX:XX:XX:XX:XX:XX 10.20.1.100 -> ligne concernée modifiée dans le fichier hosts.conf.
+      
+      - IP déjà utilisée : 
+      $add-dhcp-client.py 42:1b:22:55:a5:0c 10.20.1.100
+      error: IP address already in use.
 
-sudo -l -U sae203
+      - adresse IP incorrecte : 
+      $add-dhcp-client.py 42:1b:22:55:a5:0c 10.20123.1.100
+      error: bad IP address.
 
-Test d'exécution d'une commande autorisée :
+      - adresse MAC incorrecte : 
+      $ add-dhcp-client.py 42:1b:gg:hh:a5:0c 10.20.1.100
+      error: bad MAC address.
 
-sudo systemctl status dnsmasq
+b. remove-dhcp-client.py : 
+      Syntaxe : 
+            remove-dhcp-client.py MAC  
+      Description : 
+            - vérifie la validité de ses paramètres,
+            - interroge les serveurs dhcp via le fichier configuration.yaml pour savoir lequel possède une configuration pour cette MAC,
+            - si l'adresse MAC n'est trouvée nulle part -> message d'erreur "MAC address not found",
+            - si l'adresse MAC est trouvée, la directive dhcp-host correspondante est supprimée.
+            - met à jour la configuration et redémarre dnsmasq.
 
-Configuration YAML invalide
-Validation de la syntaxe YAML :
+Paramètres :
+      MAC : adresse MAC à supprimer
+      
+Fichiers utilisés : 
+      config.yaml : fichier de configuration des serveurs dhcp distants
+      /etc/dnsmasq.d/hosts.conf : fichier de configuration dnsmasq sur les serveurs distants.
 
-python3 -c "import yaml; yaml.safe_load(open('config.yml'))"
+Exemples :
+      - suppression réussie :    
+      $delete-client.py 42:46:dd:51:10:c1
+      Configuration mise à jour
+      
+      - MAC non trouvée :     
+      $delete-dhcp-client.py XX:XX:XX:XX:XX:XX
+      MAC address not found
 
-Service dnsmasq non démarré
-Sur le serveur DHCP :
+      - mauvaise adresse MAC : 
+      $delete-dhcp-client.py XX:XX:XX:XX:XX:XX
+      error: bad MAC address.
 
-sudo systemctl status dnsmasq
-sudo systemctl start dnsmasq
-sudo systemctl enable dnsmasq
+c. check-dhcp.py : 
+      Syntaxe :
+            check-dhcp.py [IP-OU-RESEAU]
+      
+      Description : 
+            - utilise un paramètre optionnel : [IP-OU-RESEAU],
+            Si ce paramètre est utilisé : 
+                  - cherche dans config.yaml le serveur dhcp en question,
+                  - si le serveur n'est pas trouvé -> erreur "cannot identify DHCP server" et interruption de la commande.
+                  - si le serveur est trouvé :
+                        . si une adresse MAC est présente dans 2 directives ->  on affiche les deux,
+                        . si une adresse IP est présente dans 2 directives -> on affiche les deux.
+            Si ce paramètre n'est pas utilisé -> vérification de tous les serveurs dhcp présents dans config.yaml.  
+      
+Paramètres : 
+      IP-OU-RESEAU -> paramètre optionnel spécifiant l'IP du serveur DHCP ou son réseau (exemple : 10.20.1.5 ou 10.20.1.0/24 pour le serveur dhcp 1).
 
-Logs et débogage
-Logs SSH
-Sur le serveur central :
+Fichiers utilisés :
+      config.yml : fichier de configuration des serveurs dhcp distants,
+      /etc/dnsmasq.d/hosts.conf : fichier de configuration dnsmasq sur les serveurs distants.
 
-tail -f /var/log/auth.log
+Exemples : 
+      - vérification d'un serveur spécifique :
+      $check-dhcp.py 10.20.X.0/24
+      duplicate MAC addresses:
+      dhcp-host=XX:XX:XX:XX:XX:,10.20.X.X
+      dhcp-host=XX:XX:XX:XX:XX:XX,10.20.5X.X
+      duplicate IP addresses:
+      dhcp-host=XX:XX:XX:XX:XX:XX,10.20.1.110
+      dhcp-host=XX:XX:XX:XX:XX:XX,10.20.1.110
 
-Sur les serveurs DHCP :
+      - vérification de tous les serveurs :
+      $check-dhcp.py -> affiche les duplicats s'il y en a, pour tous les serveurs dhcp présents dans config.yaml.
+                                                                                                                                                                                                                                                                                          
+d. list-dhcp.py :
+      Syntaxe :
+            list-dhcp.py [serveur]
+      
+      Description :
+            - vérifie la validité des paramètres,
+            - si le paramètre [serveur] n'est pas utilisé -> la commande liste toutes les associations MAC/IP de tous les serveurs dhcp présents dans config.yaml (2 colonnes : MAC IP).
+            - si le paramètre [serveur] est utilisé -> la commande liste toutes les associations MAC/IP pour ce serveur donné (2 colonnes : MAC IP).
 
-tail -f /var/log/auth.log | grep sae203
+Paramètres : 
+      [serveur] : serveur est un paramètre optionnel -> soit l'IP soit le nom du serveur DHCP.
 
-Logs dnsmasq
-Sur les serveurs DHCP :
+Fichiers utilisés :
+      config.yaml : fichier de configuration des serveurs dhcp distants.
+      /etc/dnsmasq.d/hosts.conf : fichier de configuration dnsmasq sur les serveurs distants.
 
-tail -f /var/log/syslog | grep dnsmasq
+Exemples :
+      - paramètre utilisé -> listage d'un serveur spécifique :
+      $list-dhcp.py 10.20.1.5
+      10.20.1.5 :
+	52:54:01:02:03:11		10.20.1.99
+      52:54:01:02:03:12		10.20.1.100
 
-Mode debug
-Ajout de verbosité dans les commandes Python :
+      - paramètre non utilisé -> listage de tous les serveurs :
+      list-dhcp.py
+	10.20.1.5 :
+      52:54:01:02:03:11		10.20.1.99
+	52:54:01:02:03:12		10.20.1.100
+	10.20.2.5 :
+	52:54:01:02:03:21		10.20.2.115
+	52:54:01:02:03:22		10.20.2.116
 
-export DEBUG=1
-python3 add-dhcp-client.py --verbose MAC IP
+En cas de problèmes : 
+1. Vérifier la connectivité ssh ainsi que le script restriction.sh si problèmes avec la connexion ssh :
+      . vérifier les commande autorisées,
+      . effectuer des tests.
+      . si problèmes avec paramiko qui n'accepte pas votre clé, tester ces lignes :
 
-Sécurité
-Bonnes pratiques
-Utilisation d'authentification SSH par clé avec passphrase
-Restriction des commandes autorisées via authorized_keys
-Configuration sudo granulaire
-Filtrage double (SSH + sudo)
-Utilisateur dédié pour les opérations de supervision
-Recommandations
-Rotation régulière des clés SSH
-Monitoring des connexions SSH
-Alertes sur les tentatives d'accès non autorisées
-Audit des modifications de configuration DHCP
+      pkey = paramiko.RSAKey.from_private_key_file("/home/sae203/.ssh/nopass_key")
+	with fabric.Connection(host = server, user = cfg["user"], connect_kwargs = {"pkey": pkey}) as cnx:
+      Cela va forcer paramiko à utiliser votre clé présente dans le répertoire que vous allez spécifier.
+
+2. Vérifier le fichier de configuration config.yaml -> le bon utilisateur, les bons serveurs dhcp et le bon chemin vers le fichier hosts.conf.
+3. Vérifier l'intégralité de vos fonctions python, la syntaxe et vérifier qu'elles fonctionnent correctement.
+
+

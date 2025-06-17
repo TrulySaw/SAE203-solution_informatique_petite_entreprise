@@ -73,21 +73,7 @@ Fonctionnalités principales :
         #pour ajouter une association dans le fichier hosts.conf
         dhcp ALL=(root) NOPASSWD: /usr/bin/tee -a /etc/dnsmasq.d/hosts.conf
 
-4. Installation des dépendances : 
-   Installation de Python et pip :
-      
-      sudo apt update
-      sudo apt install python3 python3-pip
-      
-   Installation de Fabric :
-      
-      pip3 install fabric
-      
-   Installation de PyYAML pour la configuration :
-      
-      pip3 install pyyaml
-
-5. Structure du projet : 
+4. Structure du projet : 
 
 Le projet se compose des éléments suivants :
       - config.yaml : fichier de configuration principal,
@@ -114,7 +100,7 @@ Module validation.py :
       - ip_valide(ip) : valide le format d'une adresse IP.
       - mac_valide(mac) : valide le format d'une adresse MAC,
 
-6. Manuel des commandes : 
+5. Manuel des commandes : 
 
 a. add-dhcp-client.py : 
 
@@ -250,7 +236,7 @@ Exemples :
 	52:54:01:02:03:21		10.20.2.115
 	52:54:01:02:03:22		10.20.2.116
 
-En cas de problèmes : 
+6. En cas de problèmes : 
 1. Vérifier la connectivité ssh ainsi que le script restriction.sh si problèmes avec la connexion ssh :
       . vérifier les commande autorisées,
       . effectuer des tests.

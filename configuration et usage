@@ -1,1 +1,307 @@
-dyutrufgvkh
+SAÉ2.03 - Configuration et Usage des Outils de Supervision DHCP
+
+Les outils de supervision DHCP permettent de gérer de manière centralisée l'attribution d'adresses IP fixes aux clients des différents réseaux via des serveurs DHCP distribués.
+
+Fonctionnalités principales : 
+      - Ajout et suppression de clients DHCP,
+      - Vérification d'intégrité des configurations,
+      - Listage formaté des associations MAC/IP,
+      - Gestion centralisée via SSH avec authentification par clé,
+      - Exécution sécurisée des commandes administrateur,
+      - Configuration du système.
+
+1. Fichier de configuration principal : 
+  Le fichier de configuration principal se nomme config.yaml et doit être placé, comme tous les autres fichiers dont nous parlerons plus tard, dans le répertoire ~/gestion_dhcp/
+  
+  Exemple de configuration :
+  
+        dhcp_hosts_cfg: /etc/dnsmasq.d/hosts.conf
+        user: sae203
+        dhcp-servers:
+          10.20.1.5: 10.20.1.0/24
+          10.20.2.5: 10.20.2.0/24
+  
+  Paramètres configurables : 
+        - dhcp_hosts_cfg : chemin du fichier de configuration dnsmasq sur les serveurs distants,
+        - user : utilisateur utilisé pour la connexion ssh - ici, l'utilisateur spécial est "dhcp",
+        - dhcp-servers : compte les serveurs existants - possibilité d'en rajouter/supprimer.
+
+2. Configuration SSH : 
+  -> Authentification par clé publique
+  La génération de la paire de clés est obligatoire avec ou sans passphrase :
+  
+        ssh-keygen -t rsa -C "nopass_key" -> lorsque qu'il vous demande la passphrase, simplement taper sur ENTREE si pas de passphrase.
+  
+  Copie de la clé publique sur les serveurs distants :
+  
+        ssh-copy-id sae203@10.20.1.5
+        ssh-copy-id sae203@10.20.2.5
+
+  Copie de la clé publique dans le ficher ~/.ssh/authorized_keys (se fait automatiquement avec copy-id) de l'utilisateur spécial dhcp :
+
+        ssh-copy-id dhcp@10.20.1.5:
+        ssh-copy-id dhcp@10.20.2.5:
+
+  ATTENTION : si d'autres paires de clés ont été généré auparavant, préciser la clé à transférer comme suit : ssh-copy-id -i ~/.ssh/CLE_A_TRANSFERER ...
+  
+  Configuration des commandes autorisées :
+  Sur chaque serveur DHCP, modifier le fichier ~/.ssh/authorized_keys pour restreindre les commandes SSH autorisées pour l'utilisateur "dhcp" :
+  
+        command="/usr/local/bin/dhcp-commands.sh",no-port-forwarding,no-X11-forwarding,no-agent-forwarding ssh-rsa AAAA...
+
+3. Configuration sudo : 
+  Créer le groupe superv :
+
+        sudo groupadd superv
+  
+  Ajouter l'utilisateur "dhcp" au groupe :
+  
+        sudo usermod -a -G superv dhcp
+  
+  Configuration sudoers : 
+  Créer le fichier /etc/sudoers.d/sudo_dhcp et taper dedans :
+  
+        dhcp ALL=(root) NOPASSWD: /usr/bin/systemctl restart dnsmasq
+        dhcp ALL=(root) NOPASSWD: /usr/bin/systemctl status dnsmasq
+        dhcp ALL=(root) NOPASSWD: /bin/cat /etc/dnsmasq.d/hosts.conf
+        dhcp ALL=(root) NOPASSWD: /usr/bin/sed "/d/" /etc/dnsmasq.d/hosts.conf
+        dhcp ALL=(root) NOPASSWD: /usr/bin/tee /etc/dnsmasq.d/hosts.conf
+
+4. Installation des dépendances
+Installation de Python et pip :
+
+sudo apt update
+sudo apt install python3 python3-pip
+
+Installation de Fabric :
+
+pip3 install fabric
+
+Installation de PyYAML pour la configuration :
+
+pip3 install pyyaml
+
+Manuel des commandes
+add-dhcp-client.py
+Syntaxe
+add-dhcp-client.py MAC IP
+
+Description
+Cette commande ajoute une association MAC/IP dans la configuration dnsmasq d'un serveur DHCP. Elle valide les paramètres d'entrée, identifie automatiquement le serveur DHCP concerné, vérifie les conflits potentiels (IP/MAC déjà utilisées), met à jour la configuration et redémarre le service.
+
+Paramètres
+MAC : adresse MAC au format xx:xx:xx:xx:xx:xx
+IP : adresse IP à associer
+Fichiers utilisés
+config.yml : configuration des serveurs
+/etc/dnsmasq.d/hosts.conf : configuration dnsmasq sur les serveurs distants
+Exemples
+Ajout d'une nouvelle association :
+
+ $  add-dhcp-client.py 1f:22:33:44:55:66 10.20.1.53
+Configuration du serveur dnsmasq en 10.20.1.5 mise à jour
+
+Modification d'une association existante :
+
+ $  add-dhcp-client.py 42:46:dd:51:10:c1 10.20.1.100
+Configuration mise à jour
+
+Gestion des erreurs :
+
+ $  add-dhcp-client.py 42:1b:22:55:a5:0c 10.20.1.100
+error: IP address already in use.
+
+Codes de retour
+0 : succès
+1 : erreur de paramètres ou conflit
+remove-dhcp-client.py
+Syntaxe
+remove-dhcp-client.py MAC
+
+Description
+Cette commande supprime une association MAC/IP de la configuration dnsmasq. Elle recherche l'adresse MAC sur tous les serveurs DHCP, supprime la directive dhcp-host correspondante et redémarre le service dnsmasq.
+
+Paramètres
+MAC : adresse MAC à supprimer
+Fichiers utilisés
+config.yml : configuration des serveurs
+/etc/dnsmasq.d/hosts.conf : configuration dnsmasq sur les serveurs distants
+Exemples
+Suppression réussie :
+
+ $  remove-dhcp-client.py 42:46:dd:51:10:c1
+Configuration mise à jour
+
+MAC non trouvée :
+
+ $  remove-dhcp-client.py 42:11:22:33:44:55
+MAC address not found
+
+Codes de retour
+0 : suppression réussie
+1 : MAC non trouvée ou erreur de paramètre
+check-dhcp.py
+Syntaxe
+check-dhcp.py [IP-OU-RESEAU]
+
+Description
+Cette commande vérifie la cohérence des configurations DHCP. Elle détecte les adresses MAC dupliquées, les adresses IP dupliquées et les incohérences dans les mappings.
+
+Paramètres
+IP-OU-RESEAU : paramètre optionnel spécifiant l'IP du serveur DHCP ou le réseau (exemple : 10.20.1.5 ou 10.20.1.0/24)
+Fichiers utilisés
+config.yml : configuration des serveurs
+/etc/dnsmasq.d/hosts.conf : configuration dnsmasq sur les serveurs distants
+Exemples
+Vérification d'un serveur spécifique :
+
+ $  check-dhcp.py 10.20.50.0/24
+duplicate MAC addresses:
+dhcp-host=11:22:33:44:55:66,10.20.50.100
+dhcp-host=11:22:33:44:55:66,10.20.50.125
+duplicate IP addresses:
+dhcp-host=12:34:56:78:9a:bc,10.20.50.110
+dhcp-host=99:88:77:66:55:44,10.20.50.110
+
+Vérification de tous les serveurs :
+
+ $  check-dhcp.py
+
+Cette commande analyse tous les serveurs définis dans config.yml.
+
+Codes de retour
+0 : aucune erreur détectée
+1 : erreurs détectées ou serveur non trouvé
+list-dhcp.py
+Syntaxe
+list-dhcp.py [serveur]
+
+Description
+Cette commande liste les associations MAC/IP configurées. Elle affiche les données sous forme de colonnes alignées (MAC | IP) avec séparation par espaces ou tabulations, et groupement par serveur si applicable.
+
+Paramètres
+serveur : paramètre optionnel spécifiant l'IP ou le nom du serveur DHCP
+Fichiers utilisés
+config.yml : configuration des serveurs
+/etc/dnsmasq.d/hosts.conf : configuration dnsmasq sur les serveurs distants
+Exemples
+Listage d'un serveur spécifique :
+
+ $  list-dhcp.py 10.20.1.5
+12:34:56:78:9a:bc    10.20.1.105
+11:33:55:77:99:bb    10.20.1.112
+1f:2e:3d:4c:5b:6a    10.20.1.125
+
+Listage de tous les serveurs :
+
+$ list-dhcp.py
+10.20.50.3:
+4f:6e:42:cc:d8:09    10.20.50.114
+83:16:44:da:94:c0    10.20.50.147
+a8:52:4f:11:26:44    10.20.50.44
+10.20.60.8:
+52:46:a8:01:15:4f    10.20.60.139
+57:6a:88:a1:b4:78    10.20.60.200
+
+Codes de retour
+0 : listing réussi
+1 : erreur de connexion ou serveur non trouvé
+Architecture des fichiers
+Structure du projet
+Le projet se compose des éléments suivants :
+
+config.yml : configuration principale
+add-dhcp-client.py : commande d'ajout
+remove-dhcp-client.py : commande de suppression
+check-dhcp.py : commande de vérification
+list-dhcp.py : commande de listage
+Un répertoire modules contient :
+
+dhcp.py : fonctions DHCP
+config.py : gestion configuration
+validation.py : validation des paramètres
+init.py
+Modules Python
+Module dhcp.py
+Ce module contient les fonctions suivantes :
+
+ip_other_mac_exists(cnx, ip, mac, cfg) : vérifie si une IP est déjà utilisée par une autre adresse MAC
+mac_exists(cnx, mac, cfg) : vérifie si une adresse MAC est déjà présente dans la configuration
+dhcp_add(ip, mac, server, cfg) : ajoute une correspondance IP/MAC
+dhcp_remove(mac, server, cfg) : supprime une configuration DHCP associée à une adresse MAC
+dhcp_list(server, cfg) : retourne une liste des configurations DHCP
+Module config.py
+Ce module contient les fonctions suivantes :
+
+load_config(filename, create) : charge la configuration depuis un fichier YAML
+get_dhcp_server(ip, cfg) : recherche un serveur DHCP correspondant à une adresse IP
+Module validation.py
+Ce module contient les fonctions de validation :
+
+validate_mac_address(mac) : valide le format d'une adresse MAC
+validate_ip_address(ip) : valide le format d'une adresse IP
+Dépannage
+Problèmes courants
+Erreur de connexion SSH
+Vérification de la connectivité :
+
+ssh sae203@10.20.1.5
+
+Test des clés SSH :
+
+ssh -i ~/.ssh/id_rsa sae203@10.20.1.5
+
+Permissions sudo insuffisantes
+Vérification des permissions :
+
+sudo -l -U sae203
+
+Test d'exécution d'une commande autorisée :
+
+sudo systemctl status dnsmasq
+
+Configuration YAML invalide
+Validation de la syntaxe YAML :
+
+python3 -c "import yaml; yaml.safe_load(open('config.yml'))"
+
+Service dnsmasq non démarré
+Sur le serveur DHCP :
+
+sudo systemctl status dnsmasq
+sudo systemctl start dnsmasq
+sudo systemctl enable dnsmasq
+
+Logs et débogage
+Logs SSH
+Sur le serveur central :
+
+tail -f /var/log/auth.log
+
+Sur les serveurs DHCP :
+
+tail -f /var/log/auth.log | grep sae203
+
+Logs dnsmasq
+Sur les serveurs DHCP :
+
+tail -f /var/log/syslog | grep dnsmasq
+
+Mode debug
+Ajout de verbosité dans les commandes Python :
+
+export DEBUG=1
+python3 add-dhcp-client.py --verbose MAC IP
+
+Sécurité
+Bonnes pratiques
+Utilisation d'authentification SSH par clé avec passphrase
+Restriction des commandes autorisées via authorized_keys
+Configuration sudo granulaire
+Filtrage double (SSH + sudo)
+Utilisateur dédié pour les opérations de supervision
+Recommandations
+Rotation régulière des clés SSH
+Monitoring des connexions SSH
+Alertes sur les tentatives d'accès non autorisées
+Audit des modifications de configuration DHCP

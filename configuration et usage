@@ -224,17 +224,17 @@ Exemples :
       - paramètre utilisé -> listage d'un serveur spécifique :
       $list-dhcp.py 10.20.1.5
       10.20.1.5 :
-	52:54:01:02:03:11		10.20.1.99
-      52:54:01:02:03:12		10.20.1.100
+      52:54:01:02:03:11		     10.20.1.99
+      52:54:01:02:03:12		     10.20.1.100
 
       - paramètre non utilisé -> listage de tous les serveurs :
       list-dhcp.py
-	10.20.1.5 :
-      52:54:01:02:03:11		10.20.1.99
-	52:54:01:02:03:12		10.20.1.100
-	10.20.2.5 :
-	52:54:01:02:03:21		10.20.2.115
-	52:54:01:02:03:22		10.20.2.116
+      10.20.1.5 :
+      52:54:01:02:03:11		      10.20.1.99
+      52:54:01:02:03:12		      10.20.1.100
+      10.20.2.5 :
+      52:54:01:02:03:21		      10.20.2.115
+      52:54:01:02:03:22		      10.20.2.116
 
 6. En cas de problèmes : 
 1. Vérifier la connectivité ssh ainsi que le script restriction.sh si problèmes avec la connexion ssh :
@@ -243,7 +243,7 @@ Exemples :
       . si problèmes avec paramiko qui n'accepte pas votre clé, tester ces lignes :
 
       pkey = paramiko.RSAKey.from_private_key_file("/home/sae203/.ssh/nopass_key")
-	with fabric.Connection(host = server, user = cfg["user"], connect_kwargs = {"pkey": pkey}) as cnx:
+      with fabric.Connection(host = server, user = cfg["user"], connect_kwargs = {"pkey": pkey}) as cnx:
       Cela va forcer paramiko à utiliser votre clé présente dans le répertoire que vous allez spécifier.
 
 2. Vérifier le fichier de configuration config.yaml -> le bon utilisateur, les bons serveurs dhcp et le bon chemin vers le fichier hosts.conf.
